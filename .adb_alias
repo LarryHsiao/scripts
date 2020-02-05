@@ -5,3 +5,5 @@ alias adb_home='adb shell input keyevent KEYCODE_HOME'
 alias adb_search='adb shell am start -a com.google.android.gms.actions.SEARCH_ACTION -e query $1'
 alias adb_view='adb shell am start -a android.intent.action.VIEW -d "$1"'
 
+alias adb_restart='adb kill-server && adb devices > /dev/null 2>&1 &'
+

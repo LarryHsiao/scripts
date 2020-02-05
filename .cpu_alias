@@ -1,0 +1,4 @@
+#! /bin/sh
+
+alias fly='sudo cpupower frequency-set -g performance'
+alias walk='sudo cpupower frequency-set -g powersave'
