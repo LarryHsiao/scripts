@@ -1,4 +1,5 @@
 #! /bin/sh
 
-alias fly='sudo cpupower frequency-set -g performance'
-alias walk='sudo cpupower frequency-set -g powersave'
+alias fly='sudo cpupower frequency-set -g performance &> /dev/null && sudo cpupower frequency-set --max 3.8Ghz &> /dev/null '
+alias walk='sudo cpupower frequency-set -g powersave &> /dev/null && sudo cpupower frequency-set --max 2.5GHz &> /dev/null '
+alias mooch='sudo cpupower frequency-set -g powersave &> /dev/null && sudo cpupower frequency-set --max 1GHz &> /dev/null '
