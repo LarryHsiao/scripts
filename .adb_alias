@@ -6,4 +6,9 @@ alias adb_search='adb shell am start -a com.google.android.gms.actions.SEARCH_AC
 alias adb_view='adb shell am start -a android.intent.action.VIEW -d "$1"'
 
 alias adb_restart='adb kill-server && adb devices > /dev/null 2>&1 &'
-
+alias adb_power='adb shell input keyevent 26'
+alias adb_swip_up='adb shell input touchscreen swipe 930 880 930 380'
+alias adb_input='adb shell input $@'
+alias adb_enter='adb_input keyevent 66'
+alias adb_ui_bounds_enable='adb shell setprop debug.layout true && adb shell service call activity 1599295570'
+alias adb_ui_bounds_disable='adb shell setprop debug.layout false && adb shell service call activity 1599295570'
