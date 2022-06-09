@@ -1,0 +1,4 @@
+
+alias gitl='git log --oneline --graph --all'
+alias gitf="git fetch --all --prune && git branch --merged master | grep -v '^[ *]*master$' | xargs git branch -d"
+alias gits='git status'
