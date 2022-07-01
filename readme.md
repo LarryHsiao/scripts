@@ -1,4 +1,4 @@
-Android Development scripts
+scripts
 ---
 
-Here are some of utility script for Android development environment which I often use.
+Some of scripts I'm using for development.
