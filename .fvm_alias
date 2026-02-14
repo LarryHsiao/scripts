@@ -1,0 +1,9 @@
+#! /bin/sh
+
+alias fclean='fvm flutter clean'
+alias fget='fvm flutter pub get'
+alias fanalyze='fvm flutter analyze'
+alias ftest='fvm flutter test'
+alias fdbuild='fvm dart run build_runner build'
+alias fdwatch='fvm dart run build_runner watch -d'
+alias fi18n='fvm dart run intl_utils:generate'
