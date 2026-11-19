@@ -163,6 +163,24 @@ expected="0"
 check "an unknown key triggers no sync" "$expected" "$(grep -cx 'sync' "$STUB_LOG")"
 server_state >/dev/null
 
+serve_with_keys "" "BW_SYNC_INTERVAL=1" 4
+expected="yes"
+actual=$([ "$(grep -cx 'sync' "$STUB_LOG")" -ge 1 ] && echo yes)
+check "bw-serve syncs by itself after BW_SYNC_INTERVAL seconds" "$expected" "$actual"
+server_state >/dev/null
+
+serve_with_keys "" "" 3
+expected="0"
+check "the default interval does not sync within seconds" "$expected" "$(grep -cx 'sync' "$STUB_LOG")"
+server_state >/dev/null
+
+for bad in abc 0 -5; do
+  expected="1 BW_SYNC_INTERVAL must be a whole number of seconds"
+  output=$( (source "$subject"; BW_SYNC_INTERVAL=$bad bw-serve 2>&1 </dev/null) )
+  actual="$? $(printf '%s' "$output" | grep -o 'BW_SYNC_INTERVAL must be a whole number of seconds')"
+  check "BW_SYNC_INTERVAL=$bad is refused" "$expected" "$actual"
+done
+
 serve_with_keys "" "STUB_SERVE_INTERRUPT=1" 4
 expected="lock unset"
 check "Ctrl-C locks the vault and clears the session" "$expected" "$(grep '^lock' "$STUB_LOG") $(cat "$work/after")"

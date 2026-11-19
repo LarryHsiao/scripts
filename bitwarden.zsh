@@ -99,15 +99,18 @@ _bw-serve-sync() {
 }
 
 # Runs until q, end of input, Ctrl-C (the INT trap sets the flag), or the server
-# dying. $1 is the server's pid.
+# dying; syncs on s and every $2 seconds. $1 is the server's pid.
 _bw-serve-loop() {
-  local key rc
+  local key rc last=$SECONDS
   while kill -0 "$1" 2>/dev/null && [[ -z "$_bw_interrupted" ]]; do
     key=$(_bw-read-key)
     rc=$?
     [[ $rc -eq 1 ]] && return 0
     [[ "$key" == "q" ]] && return 0
-    [[ "$key" == "s" ]] && _bw-serve-sync
+    if [[ "$key" == "s" ]] || (( SECONDS - last >= $2 )); then
+      _bw-serve-sync
+      last=$SECONDS
+    fi
   done
 }
 
@@ -124,6 +127,12 @@ bw-serve() {
   # closed terminal. The INT trap replaces any INT trap of your own and resets
   # it to default afterwards.
   local port="${BW_SERVE_PORT:-8087}" log="${TMPDIR:-/tmp}/bw-serve.log" server
+  local interval="${BW_SYNC_INTERVAL:-600}"
+
+  if [[ ! "${interval}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "bw-serve: BW_SYNC_INTERVAL must be a whole number of seconds, 1 or more" >&2
+    return 1
+  fi
 
   if _bw-port-busy "${port}"; then
     echo "bw-serve: port ${port} is already in use" >&2
@@ -137,10 +146,10 @@ bw-serve() {
 
   server=$(bw serve --port "${port}" >"${log}" 2>&1 & echo $!)
   echo "bw-serve: serving on port ${port} (log: ${log})"
-  echo "[s] sync   [q] quit and lock"
+  echo "[s] sync   [q] quit and lock   (auto-sync every ${interval}s)"
 
   trap '_bw_interrupted=1' INT
-  _bw-serve-loop "${server}"
+  _bw-serve-loop "${server}" "${interval}"
   trap - INT
   unset _bw_interrupted
   _bw-serve-stop "${server}" "${log}"
