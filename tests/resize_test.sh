@@ -39,8 +39,15 @@ check "resized/ is not processed on a second run" "$expected" "$actual"
 mkdir -p "$work/fakebin"
 printf '#!/bin/sh\necho "Microsoft disk utility"\n' > "$work/fakebin/convert"
 chmod +x "$work/fakebin/convert"
-expected="1"
-(cd "$work/pics" && PATH="$work/fakebin:/usr/bin:/bin" sh "$subject" >/dev/null 2>&1)
-check "refuses a non-ImageMagick convert" "$expected" "$?"
+# The probe asserts the stub is the only candidate: no magick on the restricted PATH.
+restricted="$work/fakebin:/usr/bin:/bin"
+expected=""
+actual=$(PATH="$restricted" command -v magick)
+check "the restricted PATH hides magick" "$expected" "$actual"
+
+expected="1 ImageMagick not found"
+output=$(cd "$work/pics" && PATH="$restricted" sh "$subject" 2>&1 >/dev/null)
+actual="$? $(printf '%s' "$output" | grep -o 'ImageMagick not found')"
+check "refuses a non-ImageMagick convert, naming ImageMagick" "$expected" "$actual"
 
 finish

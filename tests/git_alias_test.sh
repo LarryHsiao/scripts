@@ -37,4 +37,8 @@ expected="feature main"
 ( source "$subject"; gitf >/dev/null 2>&1 )
 check "gitf keeps the checked-out branch" "$expected" "$(branches)"
 
+expected="unset"
+actual=$( (source "$subject"; echo "${_git_protected-unset}") )
+check "sourcing .git_alias leaks no helper variable" "$expected" "$actual"
+
 finish

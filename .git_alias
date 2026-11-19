@@ -2,17 +2,16 @@
 alias gitl='git log --oneline --graph --all'
 # Delete local branches merged into a long-lived branch, never the long-lived
 # ones themselves or the checked-out one. Absent long-lived branches are skipped.
-_git_protected=$'main\nmaster\ndevelop\ndemo'
-
 gitf() {
   git fetch --all --prune || return 1
-  local current base branch
+  local current base branch protected
+  protected=$'main\nmaster\ndevelop\ndemo'
   current=$(git branch --show-current)
-  printf '%s\n' "$_git_protected" | while read -r base; do
+  printf '%s\n' "$protected" | while read -r base; do
     git rev-parse --verify --quiet "refs/heads/$base" >/dev/null || continue
     git branch --merged "$base" --format='%(refname:short)' | while read -r branch; do
       [ "$branch" = "$current" ] && continue
-      printf '%s\n' "$_git_protected" | grep -qx -- "$branch" && continue
+      printf '%s\n' "$protected" | grep -qx -- "$branch" && continue
       git branch -d "$branch"
     done
   done

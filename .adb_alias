@@ -3,6 +3,8 @@
 alias adb_back='adb shell input keyevent KEYCODE_BACK'
 alias adb_home='adb shell input keyevent KEYCODE_HOME'
 # Functions, not aliases: an alias cannot place its argument mid-command.
+# The unalias lets an open zsh holding the old aliases re-source this file.
+unalias adb_search adb_view 2>/dev/null
 adb_search() { adb shell am start -a com.google.android.gms.actions.SEARCH_ACTION -e query "$*"; }
 adb_view() { adb shell am start -a android.intent.action.VIEW -d "$1"; }
 
