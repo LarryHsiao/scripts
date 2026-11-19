@@ -84,5 +84,12 @@ bw-serve() {
   bw status | jq -r '"status: \(.status)   user: \(.userEmail)"' 2>/dev/null \
     || bw status
 
+  # The no-op INT trap keeps this function alive when Ctrl-C stops `bw serve`,
+  # so the vault is locked on every way out.
+  trap : INT
   bw serve --port "${port}"
+  local rc=$?
+  trap - INT
+  bw-lock
+  return "${rc}"
 }

@@ -19,6 +19,10 @@ echo "$*" >> "$STUB_LOG"
 case "$1" in
   status) printf '%s\n' "$STUB_STATUS_JSON" ;;
   unlock) echo "$STUB_SESSION" ;;
+  serve)
+    # Mimic Ctrl-C: the terminal signals the whole foreground group.
+    [ -n "$STUB_SERVE_INTERRUPT" ] && { kill -INT "$PPID"; kill -INT $$; }
+    ;;
 esac
 EOF
 cat > "$work/curl" <<'EOF'
@@ -84,6 +88,19 @@ check "bw-serve does not launch bw serve when the port is taken" "$expected" "$(
 expected="port 8087 is already in use"
 actual=$( (source "$subject"; STUB_CURL_RC=0 bw-serve 2>&1) | grep -o 'port 8087 is already in use' )
 check "bw-serve names the busy port" "$expected" "$actual"
+
+expected="lock"
+: > "$STUB_LOG"
+( source "$subject"; bw-serve >/dev/null 2>&1 )
+check "bw-serve locks the vault when bw serve exits" "$expected" "$(grep '^lock' "$STUB_LOG")"
+
+shell_name="${BASH_VERSION:+bash}${ZSH_VERSION:+zsh}"
+expected="lock unset"
+: > "$STUB_LOG"
+STUB_SERVE_INTERRUPT=1 "$shell_name" -c \
+  'source "$1"; bw-serve >/dev/null 2>&1; echo "${BW_SESSION-unset}" > "$2"' _ "$subject" "$work/after"
+actual="$(grep '^lock' "$STUB_LOG") $(cat "$work/after" 2>/dev/null)"
+check "bw-serve locks and clears the session after Ctrl-C" "$expected" "$actual"
 
 [ "$failures" -eq 0 ] || { echo "$failures failure(s)"; exit 1; }
 echo "all passed"
