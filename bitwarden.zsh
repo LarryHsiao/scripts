@@ -70,10 +70,49 @@ _bw-port-busy() {
   [[ $rc -ne 7 && $rc -ne 127 ]]
 }
 
+# Waits up to a second for one key and prints it.
+# Exit 0: a key was read. 2: none yet. 1: input has ended.
+# zsh's read cannot tell a timeout from end of input, so it asks zselect first.
+_bw-read-key() {
+  local key rc
+  if [[ -n "$ZSH_VERSION" ]]; then
+    zmodload zsh/zselect 2>/dev/null
+    zselect -t 100 -r 0 >/dev/null || return 2
+    read -rsk1 -u0 key || return 1
+  else
+    read -rsn1 -t 1 key
+    rc=$?
+    [[ $rc -gt 128 ]] && return 2
+    [[ $rc -ne 0 ]] && return 1
+  fi
+  printf '%s' "$key"
+}
+
+# Runs until q, end of input, Ctrl-C (the INT trap sets the flag), or the server
+# dying. $1 is the server's pid.
+_bw-serve-loop() {
+  local key rc
+  while kill -0 "$1" 2>/dev/null && [[ -z "$_bw_interrupted" ]]; do
+    key=$(_bw-read-key)
+    rc=$?
+    [[ $rc -eq 1 ]] && return 0
+    [[ "$key" == "q" ]] && return 0
+  done
+}
+
+# $1 is the server's pid, $2 its log file.
+_bw-serve-stop() {
+  kill "$1" 2>/dev/null || echo "bw-serve: server exited early; see $2" >&2
+  bw-lock
+}
+
 bw-serve() {
-  # Unlock (exports BW_SESSION via bw-unlock), print the auth result, then run
-  # `bw serve` in the foreground so secret.sh's REST helper can reach the vault.
-  local port="${BW_SERVE_PORT:-8087}"
+  # Unlock (exports BW_SESSION via bw-unlock), then run `bw serve` in the
+  # background so secret.sh's REST helper can reach the vault while this shell
+  # listens for keys. The vault is locked on every way out except SIGTERM and a
+  # closed terminal. The INT trap replaces any INT trap of your own and resets
+  # it to default afterwards.
+  local port="${BW_SERVE_PORT:-8087}" log="${TMPDIR:-/tmp}/bw-serve.log" server
 
   if _bw-port-busy "${port}"; then
     echo "bw-serve: port ${port} is already in use" >&2
@@ -85,13 +124,13 @@ bw-serve() {
   bw status | jq -r '"status: \(.status)   user: \(.userEmail)"' 2>/dev/null \
     || bw status
 
-  # The no-op INT trap keeps this function alive when Ctrl-C stops `bw serve`,
-  # so the vault is locked afterwards. It replaces any INT trap of your own and
-  # resets it to default on the way out; SIGTERM and a closed terminal skip the lock.
-  trap : INT
-  bw serve --port "${port}"
-  local rc=$?
+  server=$(bw serve --port "${port}" >"${log}" 2>&1 & echo $!)
+  echo "bw-serve: serving on port ${port} (log: ${log})"
+  echo "[q] quit and lock"
+
+  trap '_bw_interrupted=1' INT
+  _bw-serve-loop "${server}"
   trap - INT
-  bw-lock
-  return "${rc}"
+  unset _bw_interrupted
+  _bw-serve-stop "${server}" "${log}"
 }
