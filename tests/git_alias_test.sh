@@ -47,4 +47,9 @@ expected="function"
 actual=$("$shell_name" -c 'alias gitf=true; source "$1" 2>/dev/null; type gitf' _ "$subject" | grep -o 'function' | head -1)
 check "re-sourcing over an old gitf alias defines the function" "$expected" "$actual"
 
+# Sourced under `set -e` with no old alias present, the file must not abort the shell.
+expected="ok"
+actual=$("$shell_name" -c 'set -e; source "$1"; echo ok' _ "$subject" 2>/dev/null)
+check ".git_alias sources cleanly under set -e" "$expected" "$actual"
+
 finish

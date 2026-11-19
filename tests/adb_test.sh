@@ -28,4 +28,9 @@ expected="shell|am|start|-a|android.intent.action.VIEW|-d|https://example.com|"
 actual=$("$shell_name" -c 'alias adb_view=true; source "$1" 2>/dev/null; adb_view https://example.com' _ "$subject")
 check "re-sourcing over an old adb_view alias works" "$expected" "$actual"
 
+# Sourced under `set -e` with no old alias present, the file must not abort the shell.
+expected="ok"
+actual=$("$shell_name" -c 'set -e; source "$1"; echo ok' _ "$subject" 2>/dev/null)
+check ".adb_alias sources cleanly under set -e" "$expected" "$actual"
+
 finish
