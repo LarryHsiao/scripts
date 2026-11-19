@@ -21,6 +21,7 @@ echo "$*" >> "$STUB_LOG"
 case "$1" in
   status) printf '%s\n' "$STUB_STATUS_JSON" ;;
   unlock) echo "$STUB_SESSION" ;;
+  sync) [ "${STUB_SYNC_RC:-0}" -eq 0 ] || { echo "stub sync error"; exit "$STUB_SYNC_RC"; } ;;
   serve)
     # No env: exit at once, as a crashed server would. STUB_SERVE_STAY keeps it
     # alive; STUB_SERVE_INTERRUPT also mimics Ctrl-C reaching the shell STUB_INTERRUPT_PID.
@@ -108,8 +109,8 @@ check "bw-serve says so when the server exits on its own" "$expected" "$actual"
 serve_with_keys() {
   : > "$STUB_LOG"; rm -f "$STUB_SERVER_PID"
   { sleep 1; printf '%s' "$1"; sleep "${3:-0}"; } | env STUB_SERVE_STAY=1 $2 "$shell_name" -c \
-    'export STUB_INTERRUPT_PID=$$; source "$1"; start=$SECONDS; bw-serve >/dev/null 2>&1; echo "${BW_SESSION-unset}" > "$2"; echo $((SECONDS - start)) > "$3"' \
-    _ "$subject" "$work/after" "$work/elapsed"
+    'export STUB_INTERRUPT_PID=$$; source "$1"; start=$SECONDS; bw-serve >"$4" 2>&1; echo "${BW_SESSION-unset}" > "$2"; echo $((SECONDS - start)) > "$3"' \
+    _ "$subject" "$work/after" "$work/elapsed" "$work/serve.out"
 }
 
 # The staying stub lives five seconds; a bw-serve that waits it out is not listening.
@@ -144,6 +145,23 @@ expected="prompt"
 check "end of input returns promptly" "$expected" "$(returned_promptly)"
 expected="stopped"
 check "end of input stops the background server" "$expected" "$(server_state)"
+
+serve_with_keys "s"
+expected="sync"
+check "s triggers a bw sync" "$expected" "$(grep -x 'sync' "$STUB_LOG" | head -1)"
+expected="synced at"
+check "s reports the sync" "$expected" "$(grep -o 'synced at' "$work/serve.out" | head -1)"
+server_state >/dev/null
+
+serve_with_keys "s" "STUB_SYNC_RC=1"
+expected="sync failed: stub sync error"
+check "a failed sync is reported with bw's message" "$expected" "$(grep -o 'sync failed: stub sync error' "$work/serve.out" | head -1)"
+server_state >/dev/null
+
+serve_with_keys "x"
+expected="0"
+check "an unknown key triggers no sync" "$expected" "$(grep -cx 'sync' "$STUB_LOG")"
+server_state >/dev/null
 
 serve_with_keys "" "STUB_SERVE_INTERRUPT=1" 4
 expected="lock unset"

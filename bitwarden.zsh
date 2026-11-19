@@ -88,6 +88,16 @@ _bw-read-key() {
   printf '%s' "$key"
 }
 
+# `bw sync`, with one line saying how it went.
+_bw-serve-sync() {
+  local out
+  if out=$(bw sync 2>&1); then
+    echo "synced at $(date +%H:%M:%S)"
+  else
+    echo "sync failed: ${out}" >&2
+  fi
+}
+
 # Runs until q, end of input, Ctrl-C (the INT trap sets the flag), or the server
 # dying. $1 is the server's pid.
 _bw-serve-loop() {
@@ -97,6 +107,7 @@ _bw-serve-loop() {
     rc=$?
     [[ $rc -eq 1 ]] && return 0
     [[ "$key" == "q" ]] && return 0
+    [[ "$key" == "s" ]] && _bw-serve-sync
   done
 }
 
@@ -126,7 +137,7 @@ bw-serve() {
 
   server=$(bw serve --port "${port}" >"${log}" 2>&1 & echo $!)
   echo "bw-serve: serving on port ${port} (log: ${log})"
-  echo "[q] quit and lock"
+  echo "[s] sync   [q] quit and lock"
 
   trap '_bw_interrupted=1' INT
   _bw-serve-loop "${server}"
