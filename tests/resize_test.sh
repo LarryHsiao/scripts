@@ -17,6 +17,7 @@ width() { magick identify -format '%w' "$1"; }
 mkdir -p "$work/pics/sub"
 magick -size 3000x1000 xc:red "$work/pics/big pic.jpg"
 magick -size 3000x1000 xc:blue "$work/pics/sub/one.png"
+magick -size 1000x500 xc:green "$work/pics/small.png"
 before="$(cksum < "$work/pics/big pic.jpg")"
 
 (cd "$work/pics" && sh "$subject" >/dev/null 2>&1)
@@ -30,6 +31,9 @@ check "a file with a space gets a 2000px-wide copy" "$expected" "$(width "$work/
 
 expected="2000"
 check "a nested file keeps its relative path under resized/" "$expected" "$(width "$work/pics/resized/sub/one.png")"
+
+expected="1000"
+check "an image narrower than 2000px is copied, not enlarged" "$expected" "$(width "$work/pics/resized/small.png")"
 
 expected="absent"
 actual="absent"; [ -e "$work/pics/resized/resized" ] && actual="present"

@@ -1,6 +1,7 @@
 #! /bin/sh
-# Writes a 2000px-wide copy of every jpg/jpeg/png under the current folder into
-# ./resized/ (same relative paths), leaving the originals untouched.
+# Writes a copy of every jpg/jpeg/png under the current folder into ./resized/ (same
+# relative paths), shrunk to 2000px wide; narrower images are copied as they are.
+# The originals are left untouched.
 
 width=2000
 
@@ -19,5 +20,5 @@ while IFS= read -r file
 do
     echo "$file"
     mkdir -p "resized/$(dirname "$file")"
-    $resize "$file" -resize "${width}x" "resized/$file"
+    $resize "$file" -resize "${width}x>" "resized/$file"
 done

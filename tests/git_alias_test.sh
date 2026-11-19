@@ -41,4 +41,10 @@ expected="unset"
 actual=$( (source "$subject"; echo "${_git_protected-unset}") )
 check "sourcing .git_alias leaks no helper variable" "$expected" "$actual"
 
+# An already-open zsh holding the old `gitf` alias must be able to re-source the file.
+shell_name="${BASH_VERSION:+bash}${ZSH_VERSION:+zsh}"
+expected="function"
+actual=$("$shell_name" -c 'alias gitf=true; source "$1" 2>/dev/null; type gitf' _ "$subject" | grep -o 'function' | head -1)
+check "re-sourcing over an old gitf alias defines the function" "$expected" "$actual"
+
 finish

@@ -2,6 +2,7 @@
 alias gitl='git log --oneline --graph --all'
 # Delete local branches merged into a long-lived branch, never the long-lived
 # ones themselves or the checked-out one. Absent long-lived branches are skipped.
+unalias gitf 2>/dev/null   # lets an open zsh holding the old alias re-source this file
 gitf() {
   git fetch --all --prune || return 1
   local current base branch protected
