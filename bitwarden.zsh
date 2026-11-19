@@ -14,6 +14,10 @@ bw-unlock() {
       echo "Not logged in. Run: bw login"
       return 1
       ;;
+    *'"status":"unlocked"'*)
+      echo "Vault already unlocked."
+      return 0
+      ;;
   esac
 
   local session

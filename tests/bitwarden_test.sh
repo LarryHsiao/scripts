@@ -48,6 +48,17 @@ expected="$STUB_SESSION"
 actual=$( (source "$subject"; bw-unlock >/dev/null; echo "$BW_SESSION") )
 check "bw-unlock exports BW_SESSION" "$expected" "$actual"
 
+expected="0 existing-token"
+: > "$STUB_LOG"
+actual=$( (source "$subject"
+  export BW_SESSION="existing-token"
+  STUB_STATUS_JSON='{"status":"unlocked"}' bw-unlock >/dev/null
+  echo "$? $BW_SESSION") )
+check "bw-unlock reuses a valid session" "$expected" "$actual"
+
+expected=""
+check "bw-unlock does not prompt when already unlocked" "$expected" "$(grep '^unlock' "$STUB_LOG")"
+
 expected="serve --port 8087"
 : > "$STUB_LOG"
 ( source "$subject"; bw-serve >/dev/null 2>&1 )
