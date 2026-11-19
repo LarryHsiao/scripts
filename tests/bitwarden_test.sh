@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Tests for bitwarden.zsh against a stubbed `bw` — no real vault is touched.
-# The file must work in both shells, so run it under each:
-#   bash tests/bitwarden_test.sh && zsh tests/bitwarden_test.sh
 
 here="$(cd "$(dirname "$0")" && pwd)"
+source "$here/lib.sh"
 subject="$(dirname "$here")/bitwarden.zsh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -32,16 +31,6 @@ exit "${STUB_CURL_RC:-7}"
 EOF
 chmod +x "$work/bw" "$work/curl"
 export PATH="$work:$PATH"
-
-failures=0
-check() {
-  if [ "$2" = "$3" ]; then
-    echo "ok   - $1"
-  else
-    echo "FAIL - $1 (expected '$2', got '$3')"
-    failures=$((failures + 1))
-  fi
-}
 
 for name in bw-unlock bw-lock bw-get bw-field bw-sync bw-serve; do
   expected="defined"
@@ -108,5 +97,4 @@ STUB_SERVE_INTERRUPT=1 "$shell_name" -c \
 actual="$(grep '^lock' "$STUB_LOG") $(cat "$work/after" 2>/dev/null)"
 check "bw-serve locks and clears the session after Ctrl-C" "$expected" "$actual"
 
-[ "$failures" -eq 0 ] || { echo "$failures failure(s)"; exit 1; }
-echo "all passed"
+finish
