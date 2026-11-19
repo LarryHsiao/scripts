@@ -27,6 +27,7 @@ esac
 EOF
 cat > "$work/curl" <<'EOF'
 #!/bin/sh
+echo "curl $*" >> "$STUB_LOG"
 exit "${STUB_CURL_RC:-7}"
 EOF
 chmod +x "$work/bw" "$work/curl"
@@ -88,6 +89,11 @@ check "bw-serve does not launch bw serve when the port is taken" "$expected" "$(
 expected="port 8087 is already in use"
 actual=$( (source "$subject"; STUB_CURL_RC=0 bw-serve 2>&1) | grep -o 'port 8087 is already in use' )
 check "bw-serve names the busy port" "$expected" "$actual"
+
+expected="1"
+: > "$STUB_LOG"
+( source "$subject"; bw-serve >/dev/null 2>&1 )
+check "port probe bypasses any HTTP proxy" "$expected" "$(grep -c -- "--noproxy" "$STUB_LOG")"
 
 expected="lock"
 : > "$STUB_LOG"

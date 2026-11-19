@@ -4,6 +4,7 @@
 # `bw-get`     — fetch a password by item name.
 # `bw-field`   — fetch an arbitrary field (e.g. username, notes).
 # `bw-sync`    — pull latest vault changes.
+# `bw-serve`   — unlock, then serve the REST API in the foreground; locks on exit.
 
 bw-unlock() {
   local status_json
@@ -64,7 +65,7 @@ bw-sync() {
 # A port is busy unless curl is refused outright (exit 7). curl ships with both
 # macOS and Git Bash, unlike lsof; with no curl at all (127) we assume it is free.
 _bw-port-busy() {
-  curl -s -o /dev/null --max-time 1 "http://127.0.0.1:$1/" 2>/dev/null
+  curl -s -o /dev/null --noproxy '*' --max-time 1 "http://127.0.0.1:$1/" 2>/dev/null
   local rc=$?
   [[ $rc -ne 7 && $rc -ne 127 ]]
 }
@@ -85,7 +86,8 @@ bw-serve() {
     || bw status
 
   # The no-op INT trap keeps this function alive when Ctrl-C stops `bw serve`,
-  # so the vault is locked on every way out.
+  # so the vault is locked afterwards. It replaces any INT trap of your own and
+  # resets it to default on the way out; SIGTERM and a closed terminal skip the lock.
   trap : INT
   bw serve --port "${port}"
   local rc=$?
