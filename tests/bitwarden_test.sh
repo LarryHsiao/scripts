@@ -24,10 +24,10 @@ case "$1" in
   sync) [ "${STUB_SYNC_RC:-0}" -eq 0 ] || { echo "stub sync error"; exit "$STUB_SYNC_RC"; } ;;
   serve)
     # No env: exit at once, as a crashed server would. STUB_SERVE_STAY keeps it
-    # alive; STUB_SERVE_INTERRUPT also mimics Ctrl-C reaching the shell STUB_INTERRUPT_PID.
+    # alive; STUB_SERVE_INTERRUPT=<signal> also sends that signal to the shell STUB_INTERRUPT_PID.
     [ -n "$STUB_SERVER_PID" ] && echo $$ > "$STUB_SERVER_PID"
-    if [ -n "$STUB_SERVE_INTERRUPT" ]; then ( sleep 1; kill -INT "$STUB_INTERRUPT_PID" ) & fi
-    [ -n "$STUB_SERVE_STAY" ] && exec sleep 5
+    if [ -n "$STUB_SERVE_INTERRUPT" ]; then ( sleep 1; kill -"$STUB_SERVE_INTERRUPT" "$STUB_INTERRUPT_PID" ) & fi
+    [ -n "$STUB_SERVE_STAY" ] && exec sleep 10
     ;;
 esac
 EOF
@@ -113,9 +113,9 @@ serve_with_keys() {
     _ "$subject" "$work/after" "$work/elapsed" "$work/serve.out"
 }
 
-# The staying stub lives five seconds; a bw-serve that waits it out is not listening.
+# The staying stub lives ten seconds; a bw-serve that waits it out is not listening.
 returned_promptly() {
-  [ "$(cat "$work/elapsed")" -le 3 ] && echo "prompt" || echo "slow"
+  [ "$(cat "$work/elapsed")" -le 4 ] && echo "prompt" || echo "slow"
 }
 
 # Polls up to three seconds for the stub server to die, then reaps it.
@@ -158,9 +158,25 @@ expected="sync failed: stub sync error"
 check "a failed sync is reported with bw's message" "$expected" "$(grep -o 'sync failed: stub sync error' "$work/serve.out" | head -1)"
 server_state >/dev/null
 
-serve_with_keys "x"
+serve_with_keys "x" "" 2
 expected="0"
 check "an unknown key triggers no sync" "$expected" "$(grep -cx 'sync' "$STUB_LOG")"
+server_state >/dev/null
+
+serve_with_keys "S"
+expected="1"
+check "uppercase S also syncs" "$expected" "$(grep -cx 'sync' "$STUB_LOG")"
+server_state >/dev/null
+
+serve_with_keys "Q" "" 4
+expected="prompt"
+check "uppercase Q also quits, without waiting for end of input" "$expected" "$(returned_promptly)"
+server_state >/dev/null
+
+serve_with_keys "q"
+expected="yes"
+actual=$([ -f "$work/bw-serve-8087.log" ] && echo yes)
+check "the server log is named for its port" "$expected" "$actual"
 server_state >/dev/null
 
 serve_with_keys "" "BW_SYNC_INTERVAL=1" 4
@@ -174,19 +190,27 @@ expected="0"
 check "the default interval does not sync within seconds" "$expected" "$(grep -cx 'sync' "$STUB_LOG")"
 server_state >/dev/null
 
-for bad in abc 0 -5; do
+for bad in abc 0 -5 12345678; do
   expected="1 BW_SYNC_INTERVAL must be a whole number of seconds"
   output=$( (source "$subject"; BW_SYNC_INTERVAL=$bad bw-serve 2>&1 </dev/null) )
   actual="$? $(printf '%s' "$output" | grep -o 'BW_SYNC_INTERVAL must be a whole number of seconds')"
   check "BW_SYNC_INTERVAL=$bad is refused" "$expected" "$actual"
 done
 
-serve_with_keys "" "STUB_SERVE_INTERRUPT=1" 4
+serve_with_keys "" "STUB_SERVE_INTERRUPT=INT" 4
 expected="lock unset"
 check "Ctrl-C locks the vault and clears the session" "$expected" "$(grep '^lock' "$STUB_LOG") $(cat "$work/after")"
 expected="prompt"
 check "Ctrl-C returns promptly" "$expected" "$(returned_promptly)"
 expected="stopped"
 check "Ctrl-C stops the background server" "$expected" "$(server_state)"
+
+serve_with_keys "" "STUB_SERVE_INTERRUPT=TERM" 4
+expected="lock unset"
+check "SIGTERM locks the vault and clears the session" "$expected" "$(grep '^lock' "$STUB_LOG") $(cat "$work/after")"
+expected="prompt"
+check "SIGTERM returns promptly" "$expected" "$(returned_promptly)"
+expected="stopped"
+check "SIGTERM stops the background server" "$expected" "$(server_state)"
 
 finish

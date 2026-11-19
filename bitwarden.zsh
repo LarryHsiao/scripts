@@ -4,7 +4,7 @@
 # `bw-get`     — fetch a password by item name.
 # `bw-field`   — fetch an arbitrary field (e.g. username, notes).
 # `bw-sync`    — pull latest vault changes.
-# `bw-serve`   — unlock, then serve the REST API in the foreground; locks on exit.
+# `bw-serve`   — unlock, serve the REST API in the background; s syncs, q quits and locks.
 
 bw-unlock() {
   local status_json
@@ -108,16 +108,20 @@ _bw-serve-sync() {
   fi
 }
 
-# Runs until q, end of input, Ctrl-C (the INT trap sets the flag), or the server
+# Runs until q, end of input, a signal (the trap sets the flag), or the server
 # dying; syncs on s and every $2 seconds. $1 is the server's pid.
 _bw-serve-loop() {
-  local key rc last=$SECONDS
+  local key rc sync_now last=$SECONDS
   while kill -0 "$1" 2>/dev/null && [[ -z "$_bw_interrupted" ]]; do
     key=$(_bw-read-key)
     rc=$?
     [[ $rc -eq 1 ]] && return 0
-    [[ "$key" == "q" ]] && return 0
-    if [[ "$key" == "s" ]] || (( SECONDS - last >= $2 )); then
+    sync_now=""
+    case "$key" in
+      [qQ]) return 0 ;;
+      [sS]) sync_now=1 ;;
+    esac
+    if [[ -n "$sync_now" ]] || (( SECONDS - last >= $2 )); then
       _bw-serve-sync
       last=$SECONDS
     fi
@@ -126,29 +130,32 @@ _bw-serve-loop() {
 
 # $1 is the server's pid, $2 its log file.
 _bw-serve-stop() {
-  kill "$1" 2>/dev/null || echo "bw-serve: server exited early; see $2" >&2
+  kill "$1" 2>/dev/null || [[ -n "$_bw_interrupted" ]] \
+    || echo "bw-serve: server exited early; see $2" >&2
   bw-lock
+}
+
+# Refuses a bad interval or a busy port. $1 is the port, $2 the interval.
+_bw-serve-preflight() {
+  if [[ ! "$2" =~ ^[1-9][0-9]{0,6}$ ]]; then
+    echo "bw-serve: BW_SYNC_INTERVAL must be a whole number of seconds, 1 to 9999999" >&2
+    return 1
+  fi
+  if _bw-port-busy "$1"; then
+    echo "bw-serve: port $1 is already in use" >&2
+    return 1
+  fi
 }
 
 bw-serve() {
   # Unlock (exports BW_SESSION via bw-unlock), then run `bw serve` in the
   # background so secret.sh's REST helper can reach the vault while this shell
-  # listens for keys. The vault is locked on every way out except SIGTERM and a
-  # closed terminal. The INT trap replaces any INT trap of your own and resets
-  # it to default afterwards.
-  local port="${BW_SERVE_PORT:-8087}" log="${TMPDIR:-/tmp}/bw-serve.log" server
-  local interval="${BW_SYNC_INTERVAL:-600}"
+  # listens for keys. INT, TERM and HUP stop the server and lock the vault; the
+  # trap replaces any of your own on those signals and resets them afterwards.
+  local port="${BW_SERVE_PORT:-8087}" interval="${BW_SYNC_INTERVAL:-600}" server
+  local log="${TMPDIR:-/tmp}/bw-serve-${port}.log"
 
-  if [[ ! "${interval}" =~ ^[1-9][0-9]*$ ]]; then
-    echo "bw-serve: BW_SYNC_INTERVAL must be a whole number of seconds, 1 or more" >&2
-    return 1
-  fi
-
-  if _bw-port-busy "${port}"; then
-    echo "bw-serve: port ${port} is already in use" >&2
-    return 1
-  fi
-
+  _bw-serve-preflight "${port}" "${interval}" || return 1
   bw-unlock || return 1
 
   bw status | jq -r '"status: \(.status)   user: \(.userEmail)"' 2>/dev/null \
@@ -158,9 +165,9 @@ bw-serve() {
   echo "bw-serve: serving on port ${port} (log: ${log})"
   echo "[s] sync   [q] quit and lock   (auto-sync every ${interval}s)"
 
-  trap '_bw_interrupted=1' INT
+  trap '_bw_interrupted=1' INT TERM HUP
   _bw-serve-loop "${server}" "${interval}"
-  trap - INT
-  unset _bw_interrupted
   _bw-serve-stop "${server}" "${log}"
+  trap - INT TERM HUP
+  unset _bw_interrupted
 }
