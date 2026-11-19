@@ -197,6 +197,18 @@ for bad in abc 0 -5 12345678; do
   check "BW_SYNC_INTERVAL=$bad is refused" "$expected" "$actual"
 done
 
+# zsh only: a closed stdin must end the session, not spin until the server dies. Bash
+# has no such guard, and once bw-serve opens its own pipes it may reuse fd 0, so a
+# closed stdin has no stable meaning there.
+if [ -n "$ZSH_VERSION" ]; then
+  : > "$STUB_LOG"; rm -f "$STUB_SERVER_PID"
+  STUB_SERVE_STAY=1 "$shell_name" -c \
+    'source "$1"; start=$SECONDS; bw-serve >/dev/null 2>&1 <&-; echo $((SECONDS - start)) > "$2"' _ "$subject" "$work/elapsed"
+  expected="prompt lock"
+  check "closed stdin quits and locks (zsh)" "$expected" "$(returned_promptly) $(grep '^lock' "$STUB_LOG")"
+  server_state >/dev/null
+fi
+
 serve_with_keys "" "STUB_SERVE_INTERRUPT=INT" 4
 expected="lock unset"
 check "Ctrl-C locks the vault and clears the session" "$expected" "$(grep '^lock' "$STUB_LOG") $(cat "$work/after")"

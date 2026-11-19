@@ -161,11 +161,11 @@ bw-serve() {
   bw status | jq -r '"status: \(.status)   user: \(.userEmail)"' 2>/dev/null \
     || bw status
 
+  trap '_bw_interrupted=1' INT TERM HUP
   server=$(bw serve --port "${port}" >"${log}" 2>&1 & echo $!)
   echo "bw-serve: serving on port ${port} (log: ${log})"
   echo "[s] sync   [q] quit and lock   (auto-sync every ${interval}s)"
 
-  trap '_bw_interrupted=1' INT TERM HUP
   _bw-serve-loop "${server}" "${interval}"
   _bw-serve-stop "${server}" "${log}"
   trap - INT TERM HUP

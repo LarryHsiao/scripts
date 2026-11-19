@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # bw-serve on a real pseudo-terminal, which the pipe-fed bitwarden_test.sh cannot
-# reach: single-key reads, no-key idling, and a real group-wide Ctrl-C.
+# reach: single-key reads, no-key idling, and a real Ctrl-C keystroke. The shell is
+# started with -c, so job control is off and its background server ignores SIGINT;
+# interactive-shell Ctrl-C was checked by hand, not here.
 # Needs python3 and a Unix pty; elsewhere it skips, saying so (check by hand there).
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -33,7 +35,7 @@ export PATH="$work:$PATH"
 # Types $1 into bw-serve on a pty; prints "exited" or "serving", then reaps the stub server.
 drive() {
   : > "$STUB_LOG"; rm -f "$STUB_SERVER_PID"
-  python3 -I "$here/pty_drive.py" "$shell_name" "$subject" "$1" "$work/transcript"
+  python3 -I "$here/pty_drive.py" "$shell_name" "$subject" "$1"
   kill "$(cat "$STUB_SERVER_PID" 2>/dev/null)" 2>/dev/null
 }
 
@@ -47,10 +49,7 @@ check "s syncs once, then q quits and locks, on a terminal" "$expected" "$actual
 
 expected="exited lock"
 actual="$(drive '\x03') $(grep -x 'lock' "$STUB_LOG")"
-check "a real Ctrl-C quits and locks" "$expected" "$actual"
-
-expected="0"
-check "a real Ctrl-C does not claim the server exited early" "$expected" "$(grep -c 'exited early' "$work/transcript")"
+check "a Ctrl-C keystroke quits and locks" "$expected" "$actual"
 
 expected="serving"
 check "with no key pressed bw-serve keeps serving" "$expected" "$(drive '')"
