@@ -21,7 +21,11 @@ case "$1" in
   unlock) echo "$STUB_SESSION" ;;
 esac
 EOF
-chmod +x "$work/bw"
+cat > "$work/curl" <<'EOF'
+#!/bin/sh
+exit "${STUB_CURL_RC:-7}"
+EOF
+chmod +x "$work/bw" "$work/curl"
 export PATH="$work:$PATH"
 
 failures=0
@@ -68,6 +72,18 @@ expected="serve --port 9999"
 : > "$STUB_LOG"
 ( source "$subject"; BW_SERVE_PORT=9999 bw-serve >/dev/null 2>&1 )
 check "BW_SERVE_PORT overrides the port" "$expected" "$(grep '^serve' "$STUB_LOG")"
+
+expected="1"
+: > "$STUB_LOG"
+( source "$subject"; STUB_CURL_RC=0 bw-serve >/dev/null 2>&1 )
+check "bw-serve fails when the port is taken" "$expected" "$?"
+
+expected=""
+check "bw-serve does not launch bw serve when the port is taken" "$expected" "$(grep '^serve' "$STUB_LOG")"
+
+expected="port 8087 is already in use"
+actual=$( (source "$subject"; STUB_CURL_RC=0 bw-serve 2>&1) | grep -o 'port 8087 is already in use' )
+check "bw-serve names the busy port" "$expected" "$actual"
 
 [ "$failures" -eq 0 ] || { echo "$failures failure(s)"; exit 1; }
 echo "all passed"

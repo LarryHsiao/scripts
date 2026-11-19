@@ -61,12 +61,25 @@ bw-sync() {
   bw sync
 }
 
+# A port is busy unless curl is refused outright (exit 7). curl ships with both
+# macOS and Git Bash, unlike lsof; with no curl at all (127) we assume it is free.
+_bw-port-busy() {
+  curl -s -o /dev/null --max-time 1 "http://127.0.0.1:$1/" 2>/dev/null
+  local rc=$?
+  [[ $rc -ne 7 && $rc -ne 127 ]]
+}
+
 bw-serve() {
   # Unlock (exports BW_SESSION via bw-unlock), print the auth result, then run
   # `bw serve` in the foreground so secret.sh's REST helper can reach the vault.
-  bw-unlock || return 1
-
   local port="${BW_SERVE_PORT:-8087}"
+
+  if _bw-port-busy "${port}"; then
+    echo "bw-serve: port ${port} is already in use" >&2
+    return 1
+  fi
+
+  bw-unlock || return 1
 
   bw status | jq -r '"status: \(.status)   user: \(.userEmail)"' 2>/dev/null \
     || bw status
