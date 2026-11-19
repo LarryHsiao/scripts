@@ -72,12 +72,22 @@ _bw-port-busy() {
 
 # Waits up to a second for one key and prints it.
 # Exit 0: a key was read. 2: none yet. 1: input has ended.
-# zsh's read cannot tell a timeout from end of input, so it asks zselect first.
+# A terminal has no end of input, so there any failed read just means no key yet
+# (and old bash 3.2 reports its timeout as 1, which it must not read as the end).
+# Piped input: zsh's read cannot tell a timeout from the end, so it asks zselect
+# first (timeout in hundredths of a second); bash 4+ returns above 128 on timeout.
 _bw-read-key() {
   local key rc
-  if [[ -n "$ZSH_VERSION" ]]; then
-    zmodload zsh/zselect 2>/dev/null
-    zselect -t 100 -r 0 >/dev/null || return 2
+  if [[ -t 0 ]]; then
+    if [[ -n "$ZSH_VERSION" ]]; then
+      read -rsk1 -t 1 key || return 2   # no -u0: it makes zsh wait for Enter
+    else
+      read -rsn1 -t 1 key || return 2
+    fi
+  elif [[ -n "$ZSH_VERSION" ]]; then
+    { : <&0; } 2>/dev/null || return 1
+    zmodload zsh/zselect 2>/dev/null || { echo "bw-serve: zsh/zselect is unavailable" >&2; return 1; }
+    zselect -t 100 -r 0 >/dev/null 2>&1 || return 2
     read -rsk1 -u0 key || return 1
   else
     read -rsn1 -t 1 key
