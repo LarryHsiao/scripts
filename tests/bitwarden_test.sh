@@ -88,6 +88,13 @@ expected="port 8087 is already in use"
 actual=$( (source "$subject"; STUB_CURL_RC=0 bw-serve 2>&1) | grep -o 'port 8087 is already in use' )
 check "bw-serve names the busy port" "$expected" "$actual"
 
+# Windows takes about 2.1 s to refuse a connection to a free port; a shorter limit
+# makes curl time out (28) and the free port read as busy.
+expected="--max-time 5"
+: > "$STUB_LOG"
+{ sleep 2; } | ( source "$subject"; bw-serve >/dev/null 2>&1 )
+check "the port probe waits long enough for Windows to refuse" "$expected" "$(grep -o -e '--max-time 5' "$STUB_LOG" | head -1)"
+
 expected="1"
 : > "$STUB_LOG"
 { sleep 2; } | ( source "$subject"; bw-serve >/dev/null 2>&1 )

@@ -65,7 +65,10 @@ bw-sync() {
 # A port is busy unless curl is refused outright (exit 7). curl ships with both
 # macOS and Git Bash, unlike lsof; with no curl at all (127) we assume it is free.
 _bw-port-busy() {
-  curl -s -o /dev/null --noproxy '*' --max-time 1 "http://127.0.0.1:$1/" 2>/dev/null
+  # Windows takes about 2.1 s to refuse a connection to a free port; a shorter
+  # limit ends in curl's timeout (28), which would read as busy.
+  local seconds=5
+  curl -s -o /dev/null --noproxy '*' --max-time "$seconds" "http://127.0.0.1:$1/" 2>/dev/null
   local rc=$?
   [[ $rc -ne 7 && $rc -ne 127 ]]
 }
