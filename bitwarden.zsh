@@ -162,7 +162,9 @@ bw-serve() {
     || bw status
 
   trap '_bw_interrupted=1' INT TERM HUP
-  server=$(bw serve --port "${port}" >"${log}" 2>&1 & echo $!)
+  # --hostname: on Windows the default "localhost" binds IPv6 [::1] only, which
+  # neither the port probe nor secret.sh (both 127.0.0.1) can reach.
+  server=$(bw serve --hostname 127.0.0.1 --port "${port}" >"${log}" 2>&1 & echo $!)
   echo "bw-serve: serving on port ${port} (log: ${log})"
   echo "[s] sync   [q] quit and lock   (auto-sync every ${interval}s)"
 

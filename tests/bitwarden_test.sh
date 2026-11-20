@@ -66,12 +66,12 @@ check "bw-unlock does not prompt when already unlocked" "$expected" "$(grep '^un
 
 # Stdin is held open for two seconds in the next few checks: with input at its end
 # bw-serve quits at once, possibly before the background stub server has logged.
-expected="serve --port 8087"
+expected="serve --hostname 127.0.0.1 --port 8087"
 : > "$STUB_LOG"
 { sleep 2; } | ( source "$subject"; bw-serve >/dev/null 2>&1 )
 check "bw-serve defaults to port 8087" "$expected" "$(grep '^serve' "$STUB_LOG")"
 
-expected="serve --port 9999"
+expected="serve --hostname 127.0.0.1 --port 9999"
 : > "$STUB_LOG"
 { sleep 2; } | ( source "$subject"; BW_SERVE_PORT=9999 bw-serve >/dev/null 2>&1 )
 check "BW_SERVE_PORT overrides the port" "$expected" "$(grep '^serve' "$STUB_LOG")"
